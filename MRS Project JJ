@@ -1,0 +1,59 @@
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from datetime import datetime
+import pandas as pd
+
+# 1. Connect to Google Sheets
+scope = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/drive"
+]
+creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+client = gspread.authorize(creds)
+
+# 2. Open the main sheet
+sheet = client.open("MRS_Billing")
+
+# 3. Find today’s date and sheet
+today_date = datetime.now().strftime("%d.%m.%Y")
+try:
+    ws = sheet.worksheet(today_date)
+    print(f"✅ Sheet '{today_date}' exists.")
+except gspread.exceptions.WorksheetNotFound:
+    ws = sheet.add_worksheet(title=today_date, rows="1000", cols="4")
+    ws.append_row(["DateTime", "Employee", "Customers", "SalesAmount"])
+    print(f"✨ New sheet created: {today_date}")
+
+# 4. Example billing entry (replace with your input)
+current_time = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+employee = "Ravi"         # input() or your logic
+customers = 5
+sales_amount = 2300
+ws.append_row([current_time, employee, customers, sales_amount])
+print("✅ Billing entry added.")
+
+# 5. Calculate today total
+records_today = ws.get_all_records()
+if records_today:
+    df_today = pd.DataFrame(records_today)
+    today_total = df_today["SalesAmount"].sum()
+    print(f"📌 Today ({today_date}) Total Sales: {today_total}")
+else:
+    print("No data for today yet.")
+
+# 6. Calculate month total
+month_now = datetime.now().strftime("%m.%Y")
+month_sheets = [x for x in sheet.worksheets() if month_now in x.title]
+month_data = []
+for x in month_sheets:
+    data = pd.DataFrame(x.get_all_records())
+    if not data.empty:
+        month_data.append(data)
+if month_data:
+    month_df = pd.concat(month_data)
+    month_total = month_df["SalesAmount"].sum()
+    print(f"📌 This Month ({month_now}) Total Sales: {month_total}")
+else:
+    print("No data for this month yet.")
